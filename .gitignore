@@ -1,0 +1,29 @@
+# Generated artifacts
+data/processed/*
+!data/processed/.gitkeep
+*.pyc
+__pycache__/
+.env
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Test artefacts
+.coverage
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Eval reports (keep golden dataset, ignore generated reports)
+data/eval/report*.json

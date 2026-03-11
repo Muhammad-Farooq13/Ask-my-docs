@@ -1,3 +1,4 @@
+<!-- README is UTF-8. Re-generated to fix character-encoding corruption. -->
 <div align="center">
 
 # AskMyDocs

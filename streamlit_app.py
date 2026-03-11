@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import math
 import os
+import pickle
 import sys
+from pathlib import Path
 
 import streamlit as st
 
@@ -42,6 +44,22 @@ try:
     _HAS_BM25 = True
 except ImportError:
     _HAS_BM25 = False
+
+_DEMO_MODEL_PATH = Path(__file__).parent / "models" / "demo_bm25.pkl"
+
+
+@st.cache_resource(show_spinner="Loading BM25 demo index…")
+def _load_bm25_model() -> tuple["BM25Okapi", list[dict]] | None:
+    """Load pre-built BM25 index from disk, or build in memory as fallback."""
+    if not _HAS_BM25:
+        return None
+    if _DEMO_MODEL_PATH.exists():
+        with open(_DEMO_MODEL_PATH, "rb") as fh:
+            payload = pickle.load(fh)  # noqa: S301 — local trusted file
+        return payload["model"], payload["docs"]
+    # Fallback: build from SAMPLE_DOCS at runtime
+    tokenised = [d["text"].lower().split() for d in SAMPLE_DOCS]
+    return BM25Okapi(tokenised), SAMPLE_DOCS
 
 # ---------------------------------------------------------------------------
 # Sample corpus for BM25 demo
@@ -138,12 +156,10 @@ def _metric_card(label: str, value: str, delta: str | None = None) -> None:
         st.metric(label, value, delta)
 
 
-def _bm25_score(query: str, docs: list[dict]) -> list[dict]:
+def _bm25_score(query: str, docs: list[dict], model: "BM25Okapi") -> list[dict]:
     """Return docs sorted by BM25 score, highest first."""
-    tokenised = [d["text"].lower().split() for d in docs]
-    bm25 = BM25Okapi(tokenised)
     q_tokens = query.lower().split()
-    raw = bm25.get_scores(q_tokens)
+    raw = model.get_scores(q_tokens)
     total = sum(raw) or 1.0
     results = [
         {**doc, "score": float(s), "pct": float(s) / total * 100}
@@ -308,6 +324,14 @@ with tab_bm25:
             "`rank-bm25` is not installed. Run `pip install rank-bm25` and restart."
         )
     else:
+        _bm25_payload = _load_bm25_model()
+        if _bm25_payload is None:
+            st.error("BM25 model could not be loaded.")
+        else:
+            _bm25_index, _bm25_docs = _bm25_payload
+            src = "pre-built pkl" if _DEMO_MODEL_PATH.exists() else "in-memory (run `python build_demo.py` to persist)"
+            st.caption(f"Index source: `{src}` · {len(_bm25_docs)} documents")
+
         sample_query = st.text_input(
             "Query",
             value="how does hybrid retrieval work",
@@ -315,8 +339,9 @@ with tab_bm25:
         )
 
         if st.button("Search", type="primary") or sample_query:
-            if sample_query.strip():
-                results = _bm25_score(sample_query, SAMPLE_DOCS)
+            if sample_query.strip() and _bm25_payload:
+                _bm25_index, _bm25_docs = _bm25_payload
+                results = _bm25_score(sample_query, _bm25_docs, _bm25_index)
 
                 st.divider()
                 st.markdown(f"**Results for:** *{sample_query}*")

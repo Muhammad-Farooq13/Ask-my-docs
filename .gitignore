@@ -10,6 +10,9 @@ dist/
 build/
 *.egg-info/
 
+# Demo model (tracked — small pkl built by build_demo.py)
+# Use: python build_demo.py  to regenerate
+
 # Test artefacts
 .coverage
 coverage.xml

@@ -171,8 +171,8 @@ def _bm25_score(query: str, docs: list[dict], model: "BM25Okapi") -> list[dict]:
 # ---------------------------------------------------------------------------
 # Page tabs
 # ---------------------------------------------------------------------------
-tab_overview, tab_chunker, tab_bm25, tab_arch = st.tabs(
-    ["Overview", "Live Chunker", "BM25 Search", "Architecture & API"]
+tab_overview, tab_chunker, tab_bm25, tab_arch, tab_query = st.tabs(
+    ["Overview", "Live Chunker", "BM25 Search", "Architecture & API", "🔍 RAG Query"]
 )
 
 # ─── Tab 1: Overview ────────────────────────────────────────────────────────
@@ -473,3 +473,81 @@ pytest tests/unit/ -v
 """,
         language="bash",
     )
+
+# ─── Tab 5: RAG Query ────────────────────────────────────────────────────────
+with tab_query:
+    st.header("🔍 RAG Query Demo")
+    st.markdown(
+        "Ask a question against the built-in corpus. "
+        "BM25 retrieves the most relevant chunks; a rule-based answer is "
+        "synthesised from the top result — no API key required."
+    )
+
+    if not _HAS_BM25:
+        st.error("`rank-bm25` is not installed. Run `pip install rank-bm25` and restart.")
+    else:
+        _payload = _load_bm25_model()
+        if _payload is None:
+            st.error("BM25 model could not be loaded.")
+        else:
+            _idx, _docs = _payload
+
+            with st.form("rag_query_form"):
+                user_q = st.text_input(
+                    "Your question",
+                    value="How does hybrid retrieval work?",
+                    placeholder="e.g. What is Reciprocal Rank Fusion?",
+                )
+                top_k = st.slider("Number of results to retrieve (top-k)", 1, len(_docs), 3)
+                submitted = st.form_submit_button("🔍 Query", type="primary", use_container_width=True)
+
+            if submitted and user_q.strip():
+                ranked = _bm25_score(user_q, _docs, _idx)
+
+                st.markdown("---")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Query", user_q[:40] + ("…" if len(user_q) > 40 else ""))
+                m2.metric("Corpus size", f"{len(_docs)} docs")
+                m3.metric("Top result score", f"{ranked[0]['score']:.4f}")
+
+                st.markdown("---")
+
+                # Synthesise a simple answer from the top chunk
+                best = ranked[0]
+                st.subheader("💡 Generated Answer")
+                answer_text = (
+                    f"Based on **{best['title']}**: {best['text'][:500]}"
+                    + ("…" if len(best["text"]) > 500 else "")
+                )
+                st.success(answer_text)
+                st.caption(
+                    "⚠️ Answer synthesised from top BM25 result (no LLM). "
+                    "In production, retrieved chunks are passed to GPT-4o-mini for grounded generation."
+                )
+
+                st.markdown("---")
+                st.subheader(f"Top {top_k} Retrieved Chunks")
+
+                for rank, r in enumerate(ranked[:top_k]):
+                    label = f"#{rank+1}  {r['title']}  —  BM25 score {r['score']:.4f} ({r['pct']:.1f}%)"
+                    with st.expander(label, expanded=rank == 0):
+                        st.progress(min(r["pct"] / 100, 1.0))
+                        st.write(r["text"])
+
+                st.markdown("---")
+                st.subheader("Score Distribution Across Corpus")
+                import plotly.express as _px
+                all_ranked = _bm25_score(user_q, _docs, _idx)
+                fig_scores = _px.bar(
+                    x=[d["title"] for d in all_ranked],
+                    y=[d["score"] for d in all_ranked],
+                    color=[d["score"] for d in all_ranked],
+                    color_continuous_scale="Blues",
+                    labels={"x": "Document", "y": "BM25 Score"},
+                )
+                fig_scores.update_layout(
+                    xaxis_tickangle=-30,
+                    margin=dict(t=20, b=120),
+                    coloraxis_showscale=False,
+                )
+                st.plotly_chart(fig_scores, use_container_width=True)

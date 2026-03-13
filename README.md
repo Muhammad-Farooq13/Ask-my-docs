@@ -38,6 +38,47 @@ A single repo that takes an LLM app from "working demo" to "production-ready ser
 
 ## Architecture overview
 
+## 🏗️ Architecture Diagram
+
+```mermaid
+flowchart TD
+    A([🙋 User Query]) --> B[FastAPI\n/api/v1/query · /api/v1/query/stream]
+    B --> C[🛡️ Middleware Stack\nSecurityHeaders · RequestID · CORS · BearerToken]
+    C --> D[🔀 HybridRetriever]
+
+    D --> E[📖 BM25Store\nSparse · Keyword-based\nrank-bm25]
+    D --> F[🧠 VectorStore\nDense · FAISS cosine\nsentence-transformers]
+
+    E --> G[⚡ Reciprocal Rank Fusion\nTop-10 candidate chunks]
+    F --> G
+
+    G --> H[🎯 CrossEncoder Reranker\nms-marco-MiniLM-L-6-v2\nTop-5 ranked chunks]
+
+    H --> I{🤖 LLM Client}
+    I -->|cloud| J[OpenAI gpt-4o-mini]
+    I -->|local| K[Ollama local model]
+
+    J --> L[📜 Citation Enforcement\nSystem prompt rules\nRegex post-audit]
+    K --> L
+
+    L --> M[RAGResponse\nanswer · sources · missing_citations]
+
+    M --> N{Response Mode}
+    N -->|REST| O[📦 JSON Response]
+    N -->|Stream| P[📡 SSE Token Stream\nsources first → tokens]
+
+    O --> Q[🖥️ Streamlit UI :8501]
+    P --> Q
+
+    style A fill:#6E40C9,color:#fff
+    style Q fill:#58A6FF,color:#fff
+    style G fill:#1a1a2e,color:#58A6FF
+    style H fill:#1a1a2e,color:#FF6B6B
+    style L fill:#1a1a2e,color:#F0DB4F
+```
+
+### ASCII reference (compact)
+
 ```
 User query
     │
@@ -391,3 +432,4 @@ MIT © 2026 [Muhammad Farooq](https://github.com/Muhammad-Farooq-13). See [LICEN
 ## License
 
 MIT — see [LICENSE](LICENSE).
+

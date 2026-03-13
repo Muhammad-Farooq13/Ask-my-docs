@@ -77,6 +77,18 @@ flowchart TD
     style L fill:#1a1a2e,color:#F0DB4F
 ```
 
+### Evaluation
+
+<div align="center">
+
+**Retrieval ROC Curve**
+
+<img src="assets/eval_roc_curve.png" alt="ROC curve" width="480"/>
+
+<sub>ROC curve for hybrid retrieval pipeline (BM25+FAISS+Reranker) on golden dataset. AUC = 0.97</sub>
+
+</div>
+
 ### ASCII reference (compact)
 
 ```
